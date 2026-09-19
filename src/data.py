@@ -4,13 +4,16 @@ import yfinance as yf
 
 def latest_btc_price():
     """Return the latest available BTC-USD intraday close and timestamp."""
-    df = yf.download(
-        "BTC-USD",
-        period="2d",
-        interval="1h",
-        auto_adjust=False,
-        progress=False,
-    )
+    try:
+        df = yf.download(
+            "BTC-USD",
+            period="2d",
+            interval="1h",
+            auto_adjust=False,
+            progress=False,
+        )
+    except Exception:
+        return None, None
     if df.empty:
         return None, None
     if isinstance(df.columns, pd.MultiIndex):

@@ -20,15 +20,18 @@ if not latest_path.exists():
 
 latest = json.loads(latest_path.read_text())
 live_price, live_timestamp = latest_btc_price()
-display_price = live_price if live_price is not None else latest["current_close"]
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Current BTC", f"${display_price:,.0f}")
-c2.metric("Next-day forecast", f"${latest['next_day_forecast']:,.0f}")
-c3.metric("Expected move", f"{latest['predicted_return_pct']:+.2f}%")
-c4.metric("30d annualized vol", f"{latest['latest_annualized_volatility_pct']:.1f}%")
+if live_price is None:
+    st.warning("Live quote unavailable. The forecast remains based on historical data.")
+
+c1, c2, c3, c4, c5 = st.columns(5)
+c1.metric("Current BTC", f"${live_price:,.0f}" if live_price is not None else "Unavailable")
+c2.metric("Latest training close", f"${latest['training_data_close']:,.0f}")
+c3.metric("Next-day forecast", f"${latest['next_day_forecast']:,.0f}")
+c4.metric("Expected move", f"{latest['predicted_return_pct']:+.2f}%")
+c5.metric("30d annualized vol", f"{latest['latest_annualized_volatility_pct']:.1f}%")
 st.caption(
-    f"Live quote: {live_timestamp} | Forecast trained: {latest['as_of']} | "
-    "Run the pipeline to retrain the model."
+    f"Live quote timestamp: {live_timestamp or 'unavailable'} | "
+    f"Training data date: {latest['training_data_date']}"
 )
 
 st.divider()
@@ -36,11 +39,18 @@ st.divider()
 if metrics_path.exists():
     st.subheader("Walk-forward backtest")
     metrics = pd.read_csv(metrics_path)
-    st.dataframe(metrics, use_container_width=True, hide_index=True)
+    st.dataframe(metrics, width="stretch", hide_index=True)
+    st.write(
+        f"Final forecast model: **{latest['selected_model']}** | "
+        f"Test observations: **{int(metrics['Test_Observations'].iloc[0])}** | "
+        f"Test period: **{metrics['Test_Start'].iloc[0]} to {metrics['Test_End'].iloc[0]}**"
+    )
 
 if forecast_path.exists():
     fc = pd.read_csv(forecast_path, parse_dates=["date"])
     st.subheader("Forecast vs actual")
-    st.line_chart(fc.set_index("date")[["actual_price", "predicted_price"]])
+    actual = fc[["date", "actual_price"]].drop_duplicates("date").set_index("date")
+    predicted = fc.pivot(index="date", columns="model", values="predicted_price")
+    st.line_chart(pd.concat([actual, predicted], axis=1))
 
 st.info("This is a research forecasting system, not financial advice or an automated trading system.")

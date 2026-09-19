@@ -1,5 +1,3 @@
-from pathlib import Path
-import json
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
@@ -14,12 +12,13 @@ def metrics(actual_price, predicted_price, actual_return, predicted_return):
         "Directional_Accuracy": float(direction * 100),
     }
 
-def walk_forward_ml(df, feature_columns, min_train=1000, step=7):
+def walk_forward_ml(df, feature_columns, min_train=1000, step=7, end=None):
     rows = []
-    for end in range(min_train, len(df), step):
-        test_end = min(end + step, len(df))
-        train = df.iloc[:end]
-        test = df.iloc[end:test_end]
+    final_end = len(df) if end is None else min(end, len(df))
+    for train_end in range(min_train, final_end, step):
+        test_end = min(train_end + step, final_end)
+        train = df.iloc[:train_end]
+        test = df.iloc[train_end:test_end]
 
         model, scale = fit_calibrated_model(train, feature_columns)
         pred_r = model.predict(test[feature_columns]) * scale
@@ -51,5 +50,11 @@ def summarize(preds):
     for model, g in preds.groupby("model"):
         m = metrics(g["actual_price"], g["predicted_price"], g["actual_return"], g["predicted_return"])
         m["model"] = model
+        m["Test_Observations"] = int(len(g))
+        m["Test_Start"] = str(pd.to_datetime(g["date"]).min().date())
+        m["Test_End"] = str(pd.to_datetime(g["date"]).max().date())
         out.append(m)
-    return pd.DataFrame(out)[["model", "MAE", "RMSE", "MAPE", "Directional_Accuracy"]]
+    return pd.DataFrame(out)[[
+        "model", "MAE", "RMSE", "MAPE", "Directional_Accuracy",
+        "Test_Observations", "Test_Start", "Test_End",
+    ]]

@@ -1,110 +1,172 @@
-# BTC Forecast — Regime-Aware Bitcoin Forecasting
+# BTC Forecast Engine
 
-Round 1 submission project for the Glimpse Trading Hackathon 2026.
+Submission-ready Round 1 Bitcoin forecasting project for the Glimpse Trading Hackathon 2026.
 
-## What this project does
+## Overview
 
-This project builds a reproducible Bitcoin time-series forecasting pipeline:
+This project downloads daily BTC-USD OHLCV data, builds leakage-safe time-series features, predicts the next-day log return, and converts that return into a price forecast. It evaluates a genuine machine-learning model against a naive price-persistence baseline using chronological walk-forward backtesting.
 
-1. Downloads historical BTC-USD OHLCV data.
-2. Creates leakage-safe return, trend, momentum, volatility and lag features.
-3. Predicts the **next-day log return**, then converts it back to a BTC price forecast.
-4. Compares a naive baseline, ARIMA baseline and gradient-boosting model.
-5. Uses walk-forward / expanding-window evaluation instead of random train/test splitting.
-6. Reports MAE, RMSE, MAPE and directional accuracy.
-7. Produces forecast CSVs and plots.
-8. Provides an optional lightweight Streamlit dashboard.
-
-The primary model is `HistGradientBoostingRegressor` from scikit-learn so the project remains easy to install and practical on CPU-only laptops. An XGBoost implementation can be added later if resources permit.
-
-## Why this design?
-
-The supplied Round 1 statement asks for a working Bitcoin time-series forecasting model, historical-data testing/backtesting, a README and MIT License. The research material suggests ARIMA as a classical baseline, volatility-aware features, and careful time-series validation.
-
-The model does **not** claim to know the future perfectly. Bitcoin is noisy and non-stationary. The goal is to test whether engineered historical signals improve on simple baselines under an honest temporal evaluation.
-
-## Target
-
-For day t:
-
-`log_return(t+1) = log(Close(t+1)) - log(Close(t))`
-
-The model predicts the next-day return. The predicted price is reconstructed as:
-
-`predicted_price(t+1) = Close(t) * exp(predicted_return)`
+The project also provides a Streamlit dashboard with a live BTC quote, the latest historical training price, the model forecast, volatility, backtest metrics, and a forecast-versus-actual chart.
 
 ## Features
 
-- OHLCV-derived returns
-- 1/3/7/14/30-day returns
-- SMA and EMA ratios
-- RSI
-- ATR percentage
-- rolling volatility
-- volatility change
-- volume change
-- lagged returns
+- Automatic BTC-USD data download through Yahoo Finance
+- Daily historical training data and hourly live quote retrieval
+- Next-day log-return forecasting
+- ExtraTreesRegressor machine-learning model
+- Naive baseline: tomorrow's price equals today's close
+- Expanding-window walk-forward backtesting
+- MAE, RMSE, MAPE, directional accuracy, and test observation count
+- Transparent validation-based model selection
+- Streamlit dashboard
+- Reproducible generated artifacts in `results/`
 
-All features are calculated from information available at or before the forecast origin.
-
-## Backtesting
-
-The backtester uses expanding windows:
+## Architecture
 
 ```text
-Train ───── Test
-Train ───────── Test
-Train ───────────── Test
-Train ───────────────── Test
+Yahoo Finance data
+        |
+        v
+Cleaning and timezone normalization
+        |
+        v
+Leakage-safe feature engineering
+        |
+        +--> validation model selection
+        |
+        +--> final untouched test backtest
+        |
+        v
+Final forecast and Streamlit dashboard
 ```
 
-There is no random shuffle.
+## Model and target
 
-## Quick start — Windows PowerShell
+The genuine ML model is `ExtraTreesRegressor` from scikit-learn. It uses a small ensemble of randomized regression trees with fixed random state, limited depth, minimum leaf size, and parallel CPU execution.
+
+For forecast origin t, the target is:
+
+```text
+target_return(t) = log(Close[t+1] / Close[t])
+```
+
+The price conversion is:
+
+```text
+predicted_price(t+1) = Close[t] * exp(predicted_return(t))
+```
+
+The model is calibrated on past observations only. It can shrink the predicted return toward zero when validation shows that aggressive return predictions increase price error.
+
+The final live forecast is selected using a validation period. The final test period is not used to choose between the ML model and the naive baseline.
+
+## Features
+
+All features at time t use only data available at or before t:
+
+- Log returns over 1, 3, 7, 14, and 30 days
+- Price ratios to 7, 21, and 50-day simple moving averages
+- Price ratios to 12 and 26-day exponential moving averages
+- 7 and 14-day momentum
+- 14-day RSI
+- 14-day ATR as a percentage of price
+- 7, 14, and 30-day annualized rolling volatility
+- Volatility change and 7-day volume change
+- Lagged returns over 1, 2, 3, 7, 14, and 30 days
+
+## Data
+
+Historical data is downloaded at runtime from Yahoo Finance for `BTC-USD`. The default training start date is 2023-01-01. The requested end date is passed to Yahoo Finance as an exclusive boundary, so the generated artifact records the actual final historical date used.
+
+The latest hourly quote is fetched separately for display. It is never used to rewrite the historical training data or the backtest. If the live quote provider is unavailable, the dashboard reports `Live quote unavailable`.
+
+Raw downloaded CSV data, models, and generated results are excluded from Git by `.gitignore`.
+
+## Backtesting methodology
+
+The data is divided chronologically:
+
+- Validation: 2023-07-19 through 2025-10-26
+- Final test: 2025-10-27 through 2026-09-18
+
+For each walk-forward prediction, the model is trained only on rows before the prediction block. The training window expands forward, and the next unseen block is predicted. There is no random split or shuffle.
+
+Model selection is based only on validation MAE. Both the selected ML candidate and the naive baseline are then evaluated on the same untouched final test period.
+
+## Latest measured results
+
+These values were generated by:
 
 ```powershell
-cd btc_forecast_round1
+python -m src.pipeline --start 2023-01-01 --end 2026-09-20 --min-train 150
+```
+
+Final test period: **2025-10-27 to 2026-09-18**
+Final test observations: **327**
+
+| Model | MAE | RMSE | MAPE | Directional Accuracy |
+|---|---:|---:|---:|---:|
+| ExtraTreesCalibrated | 1273.14 | 1819.95 | 1.663% | 17.74% |
+| Naive | 1268.88 | 1807.73 | 1.658% | 0.00% |
+
+Validation selected the naive baseline by a small MAE margin, so the current generated forecast is explicitly labeled `Naive`. The ExtraTrees model remains present, trained, evaluated, and reported as the genuine ML model; its result is not hidden or relabeled.
+
+## Installation
+
+```powershell
+git clone https://github.com/kajolkcse2025-debug/btc-forecast.git
+cd btc-forecast
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python -m src.pipeline --start 2023-01-01 --end 2026-09-19
 ```
 
-Results will be written to `results/`.
+On macOS or Linux, activate with:
 
-To launch the optional dashboard:
+```bash
+source .venv/bin/activate
+```
+
+## Running
+
+Train, backtest, and generate the latest forecast:
 
 ```powershell
-streamlit run app.py
+python -m src.pipeline --start 2023-01-01 --end 2026-09-20 --min-train 150
 ```
 
-## Project structure
+Print the saved forecast artifact:
 
-```text
-btc_forecast_round1/
-├── app.py
-├── requirements.txt
-├── LICENSE
-├── README.md
-├── data/
-├── models/
-├── results/
-│   └── plots/
-└── src/
-    ├── data.py
-    ├── features.py
-    ├── models.py
-    ├── backtest.py
-    ├── pipeline.py
-    └── predict.py
+```powershell
+python -m src.predict
 ```
 
-## Submission note
+Launch the dashboard from the repository root:
 
-Do not put API keys, credentials or private data into this repository.
+```powershell
+python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8502
+```
 
-The repository should contain the code and reproducible methodology. Generated datasets can be omitted if GitHub size limits are a concern; the pipeline can download them again.
+Open `http://127.0.0.1:8502` in a browser.
 
-## Important limitation
+Generated files include:
 
-This is a forecasting research project, not a financial-advice or automated-trading system. Backtest performance is historical and does not guarantee future performance.
+- `results/metrics.csv`: final test metrics
+- `results/validation_metrics.csv`: validation metrics used for model selection
+- `results/forecasts.csv`: model, baseline, and actual test prices
+- `results/latest_forecast.json`: latest forecast and quote metadata
+- `results/plots/walk_forward_forecast.png`: final test plot
+
+## Limitations
+
+- Bitcoin is highly non-stationary and noisy.
+- Historical performance does not guarantee future performance.
+- A one-day forecast has substantial uncertainty.
+- News, liquidity, macroeconomic conditions, and market microstructure are not fully represented.
+- Yahoo Finance quote availability and timestamps can vary.
+- The current ML model does not beat the naive baseline on the latest final test period.
+- This is a research and hackathon project, not financial advice or an automated trading system.
+
+## License
+
+This project is released under the MIT License. See [LICENSE](LICENSE).

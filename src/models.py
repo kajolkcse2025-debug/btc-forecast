@@ -1,7 +1,6 @@
 import numpy as np
 from sklearn.metrics import mean_absolute_error
 from sklearn.ensemble import ExtraTreesRegressor
-from statsmodels.tsa.arima.model import ARIMA
 
 class NaiveModel:
     def fit(self, X, y):
@@ -45,8 +44,3 @@ def fit_calibrated_model(df, feature_columns, calibration_size=90):
     model.fit(df[feature_columns], df["target_return"])
     return model, float(scale)
 
-def arima_forecast(returns, order=(5, 1, 2)):
-    series = np.asarray(returns, dtype=float)
-    model = ARIMA(series, order=order, trend=None)
-    fitted = model.fit()
-    return float(fitted.forecast(steps=1)[0])
