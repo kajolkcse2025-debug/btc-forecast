@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import pandas as pd
 import streamlit as st
+from src.data import latest_btc_price
 
 st.set_page_config(page_title="BTC Forecast Engine", page_icon="₿", layout="wide")
 st.title("₿ BTC Forecast Engine")
@@ -17,11 +18,17 @@ if not latest_path.exists():
     st.stop()
 
 latest = json.loads(latest_path.read_text())
+live_price, live_timestamp = latest_btc_price()
+display_price = live_price if live_price is not None else latest["current_close"]
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Current BTC", f"${latest['current_close']:,.0f}")
+c1.metric("Current BTC", f"${display_price:,.0f}")
 c2.metric("Next-day forecast", f"${latest['next_day_forecast']:,.0f}")
 c3.metric("Expected move", f"{latest['predicted_return_pct']:+.2f}%")
 c4.metric("30d annualized vol", f"{latest['latest_annualized_volatility_pct']:.1f}%")
+st.caption(
+    f"Live quote: {live_timestamp} | Forecast trained: {latest['as_of']} | "
+    "Run the pipeline to retrain the model."
+)
 
 st.divider()
 
