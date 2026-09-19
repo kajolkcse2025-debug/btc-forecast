@@ -8,9 +8,10 @@ st.set_page_config(page_title="BTC Forecast Engine", page_icon="₿", layout="wi
 st.title("₿ BTC Forecast Engine")
 st.caption("Round 1 — time-series Bitcoin forecasting with walk-forward backtesting")
 
-metrics_path = Path("results/metrics.csv")
-forecast_path = Path("results/forecasts.csv")
-latest_path = Path("results/latest_forecast.json")
+project_root = Path(__file__).resolve().parent
+metrics_path = project_root / "results" / "metrics.csv"
+forecast_path = project_root / "results" / "forecasts.csv"
+latest_path = project_root / "results" / "latest_forecast.json"
 
 if not latest_path.exists():
     st.warning("No trained model results found yet.")
