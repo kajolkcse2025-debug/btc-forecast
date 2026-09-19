@@ -82,6 +82,24 @@ The latest hourly quote is fetched separately for display. It is never used to r
 
 Raw downloaded CSV data, models, and generated results are excluded from Git by `.gitignore`.
 
+## Project structure
+
+```text
+btc-forecast/
+├── app.py
+├── requirements.txt
+├── README.md
+├── ROUND1_SCOPE.md
+├── LICENSE
+└── src/
+        ├── backtest.py
+        ├── data.py
+        ├── features.py
+        ├── models.py
+        ├── pipeline.py
+        └── predict.py
+```
+
 ## Backtesting methodology
 
 The data is divided chronologically:
@@ -106,8 +124,8 @@ Final test observations: **327**
 
 | Model | MAE | RMSE | MAPE | Directional Accuracy |
 |---|---:|---:|---:|---:|
-| ExtraTreesCalibrated | 1273.14 | 1819.95 | 1.663% | 17.74% |
-| Naive | 1268.88 | 1807.73 | 1.658% | 0.00% |
+| ExtraTreesCalibrated | 1273.09 | 1819.94 | 1.663% | 17.74% |
+| Naive | 1268.83 | 1807.71 | 1.658% | 0.00% |
 
 Validation selected the naive baseline by a small MAE margin, so the current generated forecast is explicitly labeled `Naive`. The ExtraTrees model remains present, trained, evaluated, and reported as the genuine ML model; its result is not hidden or relabeled.
 

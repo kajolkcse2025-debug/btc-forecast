@@ -15,7 +15,7 @@ latest_path = project_root / "results" / "latest_forecast.json"
 
 if not latest_path.exists():
     st.warning("No trained model results found yet.")
-    st.code("python -m src.pipeline --start 2023-01-01 --end 2026-09-19")
+    st.code("python -m src.pipeline --start 2023-01-01 --end 2026-09-20 --min-train 150")
     st.stop()
 
 latest = json.loads(latest_path.read_text())
